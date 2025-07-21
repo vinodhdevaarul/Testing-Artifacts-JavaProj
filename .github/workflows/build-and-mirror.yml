@@ -2,8 +2,6 @@ name: Build and Mirror Dependencies
 
 on:
   push:
-    branches:
-      - main
 
 jobs:
   build-and-publish:
