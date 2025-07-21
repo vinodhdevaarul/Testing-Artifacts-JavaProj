@@ -25,6 +25,12 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+
+      - name: Configure settings.xml for GitHub Packages
+        run: |
+          echo "GITHUB_TOKEN: $GITHUB_TOKEN"
+          echo "MAVEN_REPO_URL: $MAVEN_REPO_URL"  
+          
       - name: Configure settings.xml for GitHub Packages
         run: |
           mkdir -p ~/.m2
@@ -79,7 +85,7 @@ jobs:
             # Reconstruct the POM and deploy
             mvn deploy:deploy-file \
               -Dfile="$jar" \
-              -DgroupId="third.party" \
+              -DgroupId="vinodhdevaarul.thirdparty" \
               -DartifactId="$name" \
               -Dversion="$version" \
               -Dpackaging=jar \
