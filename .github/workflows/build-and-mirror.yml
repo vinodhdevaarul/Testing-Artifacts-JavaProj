@@ -25,12 +25,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-
-      - name: Configure settings.xml for GitHub Packages
-        run: |
-          echo "GITHUB_TOKEN: $GITHUB_TOKEN"
-          echo "MAVEN_REPO_URL: $MAVEN_REPO_URL"  
-          
       - name: Configure settings.xml for GitHub Packages
         run: |
           mkdir -p ~/.m2
@@ -73,17 +67,36 @@ jobs:
         run: |
           for jar in mirrored-deps/*.jar; do
             filename=$(basename "$jar")
-            name="${filename%%-*}"
-            version="${filename##*-}"
-            version="${version%.jar}"
+            
+            # Better parsing of artifact name and version
+            if [[ "$filename" =~ ^(.+)-([0-9]+\.[0-9]+.*?)\.jar$ ]]; then
+              name="${BASH_REMATCH[1]}"
+              version="${BASH_REMATCH[2]}"
+            else
+              echo "Skipping $filename - cannot parse name and version"
+              continue
+            fi
 
             # Skip your own artifact if it's in the list
             if [[ "$name" == "my-app" ]]; then
               continue
             fi
 
-            # Reconstruct the POM and deploy
-            mvn deploy:deploy-file \
+            echo "Processing: $name version $version"
+
+            # Check if artifact already exists
+            STATUS_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "${{ env.MAVEN_REPO_URL }}/vinodhdevaarul/thirdparty/$name/$version/$name-$version.jar")
+
+            if [[ "$STATUS_CODE" == "200" ]]; then
+              echo "Artifact $name:$version already exists, skipping..."
+              continue
+            fi
+
+            # Deploy the artifact
+            echo "Deploying $name:$version..."
+            if ! mvn deploy:deploy-file \
               -Dfile="$jar" \
               -DgroupId="vinodhdevaarul.thirdparty" \
               -DartifactId="$name" \
@@ -91,7 +104,9 @@ jobs:
               -Dpackaging=jar \
               -DrepositoryId=github \
               -Durl=${{ env.MAVEN_REPO_URL }} \
-              -DgeneratePom=true
+              -DgeneratePom=true; then
+              echo "Failed to deploy $name:$version, but continuing..."
+            fi
           done
 
       - name: Build project
